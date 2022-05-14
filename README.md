@@ -1,2 +1,2 @@
 # nvae-protein
-Protein Function Prediction Using Deep Neural Network on Protein Networks
+Protein function prediction using deep neural network on protein networks
