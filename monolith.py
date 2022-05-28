@@ -5,6 +5,7 @@ from sklearn.metrics import precision_recall_fscore_support
 import torch
 import readutils
 from collections import defaultdict
+from torch.utils.data import DataLoader, Dataset
 
 NUM_PROTEINS = 18362
 
@@ -110,13 +111,30 @@ class NenvDataset(Dataset):
         return self.x[index, :], self.y[index, :]
 
 
+class DatasetWithDataLoader(Dataset):
+    def get_dataloader(self, batch_size=16, shuffle=True):
+        return DataLoader(self, batch_size=batch_size, shuffle=shuffle)
+
+class XOnly(DatasetWithDataLoader):
+    def __init__(self, x):
+        self.x = torch.Tensor(x)
+
+    def __len__(self):
+        return len(self.x)
+    
+    def __getitem__(self, index):
+        return self.x[index]
+
+
+
+
 
 ### getting models for training
 
 import models
 
-HIDDEN_LAYERS1 = 25
-HIDDEN_LAYERS2 = 10
+HIDDEN_LAYERS1 = [100, 50]
+HIDDEN_LAYERS2 = 20
 HIDDEN_LAYERS3 = 50  
 NUM_CLASSES = 50 # number of label classes
 
@@ -159,37 +177,37 @@ def train_model(model, train_dataloader, valid_dataloader, epochs, lr):
             print(f'metric_store_pred: {m.aggr()}')
             metric_stores.append(m)
 
-class MetricStore:
-    def __init__(self, mode='macro'):
-        self.precision = 0
-        self.recall = 0
-        self.f1 = 0
-        self.global_count = 0
-        self.mode = mode
+# class MetricStore:
+#     def __init__(self, mode='macro'):
+#         self.precision = 0
+#         self.recall = 0
+#         self.f1 = 0
+#         self.global_count = 0
+#         self.mode = mode
     
-    def _update(self, precision, recall, f1, n=None):
-        self.precision += precision
-        self.recall += recall 
-        self.f1 += f1 
-        if self.mode == 'micro': assert isinstance(n, int)
-        else: n = 1
-        self.global_count += 1 if n is None else n
+#     def _update(self, precision, recall, f1, n=None):
+#         self.precision += precision
+#         self.recall += recall 
+#         self.f1 += f1 
+#         if self.mode == 'micro': assert isinstance(n, int)
+#         else: n = 1
+#         self.global_count += 1 if n is None else n
     
-    def __call__(self, ytrue, ypred):
-        p, r, f1, _ = precision_recall_fscore_support(ytrue, ypred, average=self.mode)
-        n = len(ytrue)
-        self._update(p, r, f1, n=n)
+#     def __call__(self, ytrue, ypred):
+#         p, r, f1, _ = precision_recall_fscore_support(ytrue, ypred, average=self.mode)
+#         n = len(ytrue)
+#         self._update(p, r, f1, n=n)
 
 
-    def aggr(self):
-        assert self.global_count > 0
-        return dict(
-            precision=self.precision/self.global_count,
-            recall=self.recall/self.global_count,
-            f1=self.f1/self.global_count)
+#     def aggr(self):
+#         assert self.global_count > 0
+#         return dict(
+#             precision=self.precision/self.global_count,
+#             recall=self.recall/self.global_count,
+#             f1=self.f1/self.global_count)
 
-    def __str__(self):
-        return str(self.aggr())
+#     def __str__(self):
+#         return str(self.aggr())
 
 
 

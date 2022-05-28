@@ -1,3 +1,5 @@
+from pyexpat import model
+from warnings import catch_warnings
 import monolith
 import readutils
 import networkx as nx 
@@ -5,6 +7,10 @@ import numpy as np
 import os 
 import json 
 from sklearn.model_selection import train_test_split 
+import models
+import torch
+import pdb
+
 
 NETWORK_FILE = '/Users/v.pathak/Projects/shivani_project/raw_data/mashup/data/networks/human/human_string_database_adjacency.txt'
 NET_GENES_FILE = "/Users/v.pathak/Projects/shivani_project/raw_data/mashup/data/networks/human/human_string_genes.txt"
@@ -65,6 +71,11 @@ def load_txt(name):
     return readutils.readfoldertext(name)
 
 
+def get_autoencoder_model(hidden_layer=None):
+    return models.AutoEncoderOnly(
+        monolith.GraphFeatures.DIMENSIONS, 
+        monolith.HIDDEN_LAYERS1, hidden_layer or monolith.HIDDEN_LAYERS2)
+
 def main(all_nodes=False, cached=False):
     if cached:
         labels = load_json('labels')
@@ -93,7 +104,26 @@ def main(all_nodes=False, cached=False):
         save_np(labels_one_hot, 'labels_one_hot')
     
     X, y = network_feats, labels_one_hot
+
+    X = (X-X.mean(axis=-2))/X.std(axis=-2)
     xtrain, xvalid, ytrain, yvalid = train_test_split(X, y)
+
+    xtrain = models.XOnly(xtrain)
+    xvalid = models.XOnly(xvalid)
+
+    aemodel = get_autoencoder_model()
+    trainer = models.Trainer(aemodel)
+    trainer.compile(torch.nn.MSELoss(), torch.optim.Adam, lr=0.01)
+
+    globals()['_trainer'] = trainer
+    lr_scheduler = lambda x: torch.optim.lr_scheduler.ExponentialLR(x, gamma=0.95)
+    trainer.train(xtrain, xvalid, batch_size=1000, logevery=25, lr_scheduler=lr_scheduler)
+
+    return trainer, X, y
+    
+    # pdb.set_trace()
+    
+
 
 
 
@@ -119,4 +149,4 @@ def main(all_nodes=False, cached=False):
 
 
 if __name__ == '__main__':
-    main(all_nodes=True)
+    main(all_nodes=True, cached=True)
